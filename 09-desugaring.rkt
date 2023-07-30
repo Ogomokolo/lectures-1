@@ -78,9 +78,11 @@ e.g., how might we desugar a function application with more than 1 argument?
     [(? integer?)
      (int-exp sexp)]
 
-    ;; arithmetic expression
-    [(list (and op (or '+ '*)) lhs rhs)
-     (arith-exp (symbol->string op) (parse lhs) (parse rhs))]
+    ;; arithmetic expressions
+    [(list '+ lhs rhs)
+     (arith-exp "PLUS" (parse lhs) (parse rhs))] 
+    [(list '* lhs rhs)
+     (arith-exp "TIMES" (parse lhs) (parse rhs))]
     
     ;; identifiers (variables)
     [(? symbol?)
@@ -120,10 +122,10 @@ e.g., how might we desugar a function application with more than 1 argument?
       ;; int literal
       [(int-exp val) val]
 
-      ;; arithmetic expression
-      [(arith-exp "+" lhs rhs)
+      ;; arithmetic expressions
+      [(arith-exp "PLUS" lhs rhs)
        (+ (eval-env lhs env) (eval-env rhs env))]
-      [(arith-exp "*" lhs rhs)
+      [(arith-exp "TIMES" lhs rhs)
        (* (eval-env lhs env) (eval-env rhs env))]         
       
       ;; variable binding

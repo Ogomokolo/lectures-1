@@ -77,9 +77,11 @@ we can use `let` to bind identifiers to lambdas. E.g.,
     [(? integer?)
      (int-exp sexp)]
 
-    ;; arithmetic expression
-    [(list (and op (or '+ '*)) lhs rhs)
-     (arith-exp (symbol->string op) (parse lhs) (parse rhs))]
+    ;; arithmetic expressions
+    [(list '+ lhs rhs)
+     (arith-exp "PLUS" (parse lhs) (parse rhs))] 
+    [(list '* lhs rhs)
+     (arith-exp "TIMES" (parse lhs) (parse rhs))]
     
     ;; identifiers (variables)
     [(? symbol?)
@@ -110,10 +112,10 @@ we can use `let` to bind identifiers to lambdas. E.g.,
       ;; int literals
       [(int-exp val) val]
 
-      ;; arithmetic expressions
-      [(arith-exp "+" lhs rhs)
+      ;; arithmetic expressions    
+      [(arith-exp "PLUS" lhs rhs)
        (+ (eval-env lhs env) (eval-env rhs env))]
-      [(arith-exp "*" lhs rhs)
+      [(arith-exp "TIMES" lhs rhs)
        (* (eval-env lhs env) (eval-env rhs env))]         
 
       ;; variable binding
