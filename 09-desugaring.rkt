@@ -18,7 +18,7 @@ Pros/Cons? (Discussion)
 
 ---
 
-Parse / Desugar / Interpret workflow:
+Parse / Desugar / Interpret workflow: (IR - Intermediate Representation)
 
     Program (input language) => Parser => Syntax Tree / IR (input language)
 

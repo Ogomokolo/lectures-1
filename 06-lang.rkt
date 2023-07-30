@@ -54,7 +54,95 @@ So what *really* happens when we load a source file into a Racket interpreter?
 
 ;; Implement a reader & expander for the "program" in 06-lang-demo.rkt
 
+#; ; Version 1
+(define (read-syntax path port)
+  (let ([src-lines (filter non-empty-string?
+                           (map string-trim (port->lines port)))])
+    (datum->syntax #f ; remove any lexical context
+                   `(module demo racket
+                      ,@src-lines))))
 
+#; ; Version 2
+(define (read-syntax path port)
+  
+  (define (non-comment? line)
+    (and (non-empty-string? line)
+         (not (string-prefix? line "--"))))
+  
+  (define (make-form line)
+    (match-let ([(list name val) (string-split line)])
+      (list name (string->number val))))
+  
+  (let ([src-lines (filter non-comment?
+                           (map string-trim (port->lines port)))])
+    (datum->syntax #f ; remove any lexical context
+                   `(module demo racket
+                      (quote, (map make-form src-lines))))))
+
+#; ; Version 3
+(define (read-syntax path port)
+  
+  (define (non-comment? line)
+    (and (non-empty-string? line)
+         (not (string-prefix? line "--"))))
+  
+  (define (make-form line)
+    (match-let ([(list name val) (string-split line)])
+      `(update, name, (string->number val))))
+  
+  (let ([src-lines (filter non-comment?
+                           (map string-trim (port->lines port)))])
+    (datum->syntax #f ; remove any lexical context
+                   `(module demo racket
+                      (quote, (map make-form src-lines))))))
+
+#; ; Version 4
+(define (read-syntax path port)
+  
+  (define (non-comment? line)
+    (and (non-empty-string? line)
+         (not (string-prefix? line "--"))))
+  
+  (define (make-form line)
+    (match-let ([(list name val) (string-split line)])
+      `(update, name, (string->number val))))
+  
+  (let ([src-lines (filter non-comment?
+                           (map string-trim (port->lines port)))])
+    (datum->syntax #f ; remove any lexical context
+                   `(module demo "06-lang.rkt"
+                      ,@(map make-form src-lines)
+                      players))))
+
+(provide read-syntax)
+
+(define players (make-hash))
+
+(define (update name val)
+  (hash-set! players name (+ val (hash-ref players name 0))))
+
+(provide update players)
+
+; Version 5
+(define (read-syntax path port)
+  
+  (define (non-comment? line)
+    (and (non-empty-string? line)
+         (not (string-prefix? line "--"))))
+  
+  (define (make-form lines)
+    (for/fold ([acc '(hash)])
+              ([l lines])
+    (match-let ([(list name val) (string-split l)])
+      `(hash-update, acc, name (curry +, (string->number val)) 0))))
+  
+  (let ([src-lines (filter non-comment?
+                           (map string-trim (port->lines port)))])
+    (datum->syntax #f ; remove any lexical context
+                   `(module demo racket
+                      (quote ,(make-form src-lines))))))
+
+(provide hash-update hash curry +)
 
 #|-----------------------------------------------------------------------------
 ;; Interposition points

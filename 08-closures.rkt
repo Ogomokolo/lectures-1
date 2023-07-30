@@ -64,10 +64,10 @@ we can use `let` to bind identifiers to lambdas. E.g.,
 (struct let-exp (ids vals body) #:transparent)
 
 ;; lambda expression
-(struct lambda-exp () #:transparent)
+(struct lambda-exp (id body) #:transparent)
 
 ;; function application
-(struct app-exp () #:transparent)
+(struct app-exp (fn arg) #:transparent)
 
 
 ;; Parser
@@ -90,17 +90,20 @@ we can use `let` to bind identifiers to lambdas. E.g.,
      (let-exp (map parse id) (map parse val) (parse body))]
     
     ;; lambda expressions
-    [_ (void)]
+    [(list 'lambda (list id) body)
+     (lambda-exp id (parse body))]
 
     ;; function application
-    [_ (void)]
+    [(list fn arg)
+     (app-exp (parse fn) (parse arg))]
 
     ;; basic error handling
     [_ (error (format "Can't parse: ~a" sexp))]))
 
+;;//////////////////////////////////////////////////////////////////////////////////////
 
 ;; Interpreter
-(define (eval expr)
+(define (eval-dyn-strict expr) ;; strict dynamic binding
   (let eval-env ([expr expr]
                  [env '()])
     (match expr
@@ -124,19 +127,113 @@ we can use `let` to bind identifiers to lambdas. E.g.,
       [(let-exp (list (var-exp id) ...) (list val ...) body)
        (let ([vars (map cons id
                         (map (lambda (v)
-                               (eval-env v env))
+                               (eval-env v env)) ;; strict evaluation!
                              val))])
          (eval-env body (append vars env)))]
 
       ;; lambda expression
-      [_ (void)]
+      [(lambda-exp id body)
+       (lambda-exp id body)] ;; no evaluation needed!
       
       ;; function application
-      [_ (void)]
+      [(app-exp f arg)
+       (match-let ([(lambda-exp id body)(eval-env f env)]
+                   [arg-val (eval-env arg env)]) ;; pass-by-value semantics
+         (eval-env body (cons (cons id arg-val) env)))]
 
       ;; basic error handling
       [_ (error (format "Can't evaluate: ~a" expr))])))
 
+;;//////////////////////////////////////////////////////////////////////////////////////
+
+;; Interpreter 2
+(define (eval-dyn-lazy expr) ;; dynamic binding
+  (let eval-env ([expr expr]
+                 [env '()])
+    (match expr
+      ;; int literals
+      [(int-exp val) val]
+
+      ;; arithmetic expressions
+      [(arith-exp "+" lhs rhs)
+       (+ (eval-env lhs env) (eval-env rhs env))]
+      [(arith-exp "*" lhs rhs)
+       (* (eval-env lhs env) (eval-env rhs env))]         
+
+      ;; variable binding
+      [(var-exp id)
+       (let ([pair (assoc id env)])
+         (if pair
+             (eval-env (cdr pair) env) ;; evsluate at last possible place
+             (error (format "~a not bound!" id))))]
+
+      ;; let expression with multiple variables
+      [(let-exp (list (var-exp id) ...) (list val ...) body)
+       (let ([vars (map cons id val)])
+         (eval-env body (append vars env)))]
+
+      ;; lambda expression
+      [(lambda-exp id body)
+       (lambda-exp id body)] ;; no evaluation needed!
+      
+      ;; function application
+      [(app-exp f arg)
+       (match-let ([(lambda-exp id body)(eval-env f env)])                   
+         (eval-env body (cons (cons id arg) env)))] ;; call-by-name
+
+      ;; basic error handling
+      [_ (error (format "Can't evaluate: ~a" expr))])))
+
+;;//////////////////////////////////////////////////////////////////////////////////////
+
+;; function value / cloure: we'll use this to pass the environment to the lambda-exp
+(struct func-val (id body env) #:transparent)
+
+;; Interpreter 3
+(define (eval-lex expr) ;; lexical binding + working closures
+  (let eval-env ([expr expr]
+                 [env '()])
+    (match expr
+      ;; int literals
+      [(int-exp val) val]
+
+      ;; arithmetic expressions
+      [(arith-exp "+" lhs rhs)
+       (+ (eval-env lhs env) (eval-env rhs env))]
+      [(arith-exp "*" lhs rhs)
+       (* (eval-env lhs env) (eval-env rhs env))]         
+
+      ;; variable binding
+      [(var-exp id)
+       (let ([pair (assoc id env)])
+         (if pair
+             (cdr pair)
+             (error (format "~a not bound!" id))))]
+
+      ;; let expression with multiple variables
+      [(let-exp (list (var-exp id) ...) (list val ...) body)
+       (let ([vars (map cons id
+                        (map (lambda (v)
+                               (eval-env v env)) ;; strict evaluation!
+                             val))])
+         (eval-env body (append vars env)))]
+
+      ;; lambda expression
+      [(lambda-exp id body)
+       (func-val id body env)] ;; no evaluation needed!
+      
+      ;; function application
+      [(app-exp f arg)
+       ; clenv means closure environment and it represents the env at the time
+       ; the lambda was created
+       (match-let ([(func-val id body clenv)(eval-env f env)]
+                   [arg-val (eval-env arg env)]) ;; pass-by-value semantics
+         (eval-env body (cons (cons id arg-val) clenv)))]
+
+      ;; basic error handling
+      [_ (error (format "Can't evaluate: ~a" expr))])))
+
+;;//////////////////////////////////////////////////////////////////////////////////////
 
 ;; REPL
 (define (repl)

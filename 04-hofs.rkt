@@ -21,15 +21,44 @@ Some useful built-in HOFs and related functions:
 
 ;; `apply` applies a function to lists
 
+(define (sum . ns)
+  (+ 2 (apply + ns)))
+
 
 ;; `curry` gives us partial application
+
+(define (repeat n x)
+  (if (= n 0)
+      '()
+      (cons x (repeat (sub1 n) x))))
+
+(define thrice (curry repeat 3))
 
 
 ;; compose is a simple but powerful form of "functional "glue"
 
+(define (compose f g)
+  (lambda (x)
+    (f (g x))))
+
+(define safe-sqrt (compose sqrt abs))
+
+(define (flip f)
+  (lambda (x y) (f y x)))
+
+(define even?
+  (compose (curry = 0)
+           (curry (flip remainder) 2)))
+
 
 ;; eval is like having access to the Racket compiler in Racket!
 
+(define (my-if test e1 e2)
+  (eval `(cond [,test ,e1]
+               [else ,e2])))
+
+(define (repeatedly n sexp)
+  (eval (cons 'begin (repeat n sexp))))
 
 
 #|-----------------------------------------------------------------------------
@@ -45,6 +74,13 @@ Some useful built-in HOFs and related functions:
 -----------------------------------------------------------------------------|#
 
 ;; `map` examples
+(define (map f lst)
+  (if (empty? lst)
+      '()
+      (cons (f (first lst)) (map f (rest lst)))))
+
+; (trace map)
+
 #; (values
    (map add1 (range 10))
 
@@ -54,6 +90,13 @@ Some useful built-in HOFs and related functions:
 
 
 ;; `filter` examples
+(define (filter p lst)
+  (cond [(empty? lst) '()]
+        [(p (first lst)) (cons (first lst) (filter p (rest lst)))]
+        [else (filter p (rest lst))]))
+
+; (trace map)
+
 #; (values 
    (filter even? (range 10))
    
@@ -68,6 +111,11 @@ Some useful built-in HOFs and related functions:
 
 
 ;; `foldr` examples
+(define (foldr f baseval lst)
+  (if (empty? lst)
+      baseval
+      (f (first lst) (foldr f baseval (rest lst)))))
+
 #; (values
     (foldr + 0 (range 10))
 
@@ -79,9 +127,19 @@ Some useful built-in HOFs and related functions:
            '()
            (range 5)))
 
+(define sum2 (curry foldr + 0))
+
+(define copy-list (curry foldr cons '()))
+
+(define (concatenate l1 l2) (foldr cons l2 l1))
 
 ;; `foldl` examples
-#; (values
+(define (foldl f acc lst)
+  (if (empty? lst)
+      acc
+      (foldl f (f (first lst) acc) (rest lst))))
+
+ (values
     (foldl + 0 (range 10))
     
     (foldl cons '() (range 10))
@@ -92,6 +150,19 @@ Some useful built-in HOFs and related functions:
            '()
            (range 5)))
 
+(define reverse (curry foldl cons '()))
+
+(define sum3 (curry foldl + 0))
+
+(define (partition x lst)
+  (foldl (lambda (y acc)
+           (if (< y x)
+               (list (cons y (first acc))
+                     (second acc))
+               (list (first acc)
+                     (cons y (second acc)))))
+         '(() ())
+         lst))
 
 
 #|-----------------------------------------------------------------------------
@@ -102,3 +173,27 @@ Some useful built-in HOFs and related functions:
 
 - This leads to one of the most important ideas we'll see: the *closure*
 -----------------------------------------------------------------------------|#
+
+(define (simple n)
+  (let ([loc 10])
+    (+ n loc)))
+
+(define (weird n)
+  (let ([loc n])
+    (lambda ()
+      (println loc))))
+
+(define (weird2 n)
+  (lambda ()
+    (println n)))
+
+(define (make-adder n)
+  (lambda (x) (+ x n)))
+
+(define (make-obj)
+  (let ([attr 0])
+    (lambda (cmd)
+      (case cmd
+        ['inc (set! attr (add1 attr))]
+        ['dec (set! attr (sub1 attr))]
+        ['show (println attr)]))))

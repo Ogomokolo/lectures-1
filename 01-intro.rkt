@@ -65,8 +65,20 @@ A sexp is either an *atom* or a *list*.
 
 ;; Let's write some (syntactically) valid sexps!
 ;; Note: `#;` is a convenient, special "sexp comment"
+#|
+1
 
+42
 
+1/2
+
+"hello"
+
+#; hello
+
+#;
+(hi! this[1 2 3])
+|#
 
 #|-----------------------------------------------------------------------------
 ;; Evaluating sexps

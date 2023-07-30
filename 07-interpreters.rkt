@@ -97,6 +97,8 @@ Review: What is parsing?
 ;;; using Racket's reader
 #; (read)
 
+(define (string-read str)
+  (read (open-input-string str)))
 
 
 #|-----------------------------------------------------------------------------
@@ -112,21 +114,33 @@ Review: What is parsing?
 ;;; Some types for decorating our syntax tree
 
 ;; integer value
-(struct int-exp () #:transparent)
+(struct int-exp (val) #:transparent)
 
 ;; arithmetic expression
-(struct arith-exp () #:transparent)
+(struct arith-exp (op lhs rhs) #:transparent)
 
 ;; variable
-(struct var-exp () #:transparent)
+(struct var-exp (id) #:transparent)
 
 ;; let expression
-(struct let-exp () #:transparent)
+(struct let-exp (ids vals body) #:transparent)
 
 
 ;; Parser
 (define (parse sexp)
-  (void))
+  (match sexp
+    [(? integer?)
+     (int-exp sexp)]
+    [(list '+ lhs rhs)
+     (arith-exp "+" (parse lhs) (parse rhs))]
+    [(list '* lhs rhs)
+     (arith-exp "*" (parse lhs) (parse rhs))]
+    [(? symbol?)
+     (var-exp sexp)]
+    [(list 'let (list (list id val) ...) body)
+     (let-exp (map parse id) (map parse val) (parse body))]
+    [_
+     (error (format "Can't parse ~a" sexp))]))
 
 
 #|-----------------------------------------------------------------------------
@@ -137,4 +151,30 @@ Review: What is parsing?
 
 ;; Interpreter
 (define (eval expr)
-  (void))
+  (let eval-env ([expr expr]
+                 [env '()])
+    (match expr
+      [(int-exp val)
+       val]
+      [(arith-exp "+" lhs rhs)
+       (+ (eval-env lhs env) (eval-env rhs env))]
+      [(arith-exp "*" lhs rhs)
+       (* (eval-env lhs env) (eval-env rhs env))]
+      [(var-exp id)
+       (let ([pair (assoc id env)])
+         (if pair
+             (cdr pair)
+             (error (format "~a is not bound!" id))))]
+      [(let-exp (list (var-exp id))
+                (list val)
+                body)
+       (eval-env body (cons (cons id (eval-env val env)) env))]
+      [(let-exp (list (var-exp id) ...)
+                  (list val ...)
+                  body)
+         (let ([vars (map cons
+                          id
+                          (map (lambda (v) (eval-env v env)) val))])
+           (eval-env body (append vars env)))]
+      [_
+       (error (format "Can't evaluate ~a" exp))])))
